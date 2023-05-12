@@ -1,4 +1,5 @@
 import os
+import time
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,7 @@ class UNet3DTrainer:
                  validate_after_iters=100, log_after_iters=100,
                  validate_iters=None, num_iterations=1, num_epoch=0,
                  eval_score_higher_is_better=True, best_eval_score=None,
-                 tensorboard_formatter=None, skip_train_validation=False):
+                 tensorboard_formatter=None, skip_train_validation=False, config=None):
 
         self.model = model
         self.optimizer = optimizer
@@ -65,6 +66,7 @@ class UNet3DTrainer:
         self.log_after_iters = log_after_iters
         self.validate_iters = validate_iters
         self.eval_score_higher_is_better = eval_score_higher_is_better
+        self.config = config
 
         logger.info(model)
         logger.info(f'eval_score_higher_is_better: {eval_score_higher_is_better}')
@@ -163,13 +165,21 @@ class UNet3DTrainer:
 
         # sets the model in training mode
         self.model.train()
-
+        total_time = 0.0
+        total_sample = 0
         for i, t in enumerate(train_loader):
+            if i >= self.config["num_iter"] and self.config["num_iter"] > 0:
+                break
             logger.info(
                 f'Training iteration {self.num_iterations}. Batch {i}. Epoch [{self.num_epoch}/{self.max_num_epochs - 1}]')
 
             input, target, weight = self._split_training_batch(t)
-
+            if self.config["channels_last"]:
+                try:
+                    input = input.to(memory_format=torch.channels_last)
+                except:
+                    pass
+            tic = time.time()
             output, loss = self._forward_pass(input, target, weight)
 
             train_losses.update(loss.item(), self._batch_size(input))
@@ -178,6 +188,10 @@ class UNet3DTrainer:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            toc = time.time()
+            if i >= self.config["num_warmup"]:
+                total_time += (toc - tic)
+                total_sample += self.config["loaders"]["batch_size"]
 
             if self.num_iterations % self.validate_after_iters == 0:
                 # set the model in eval mode
@@ -222,7 +236,10 @@ class UNet3DTrainer:
                 return True
 
             self.num_iterations += 1
-
+        latency = total_time / total_sample * 1000
+        throughput = total_sample / total_time
+        print('training latency: %0.3f ms on %d epoch'%(latency, self.num_epoch))
+        print('training Throughput: %0.3f images/s on %d epoch'%(throughput, self.num_epoch))
         return False
 
     def should_stop(self):

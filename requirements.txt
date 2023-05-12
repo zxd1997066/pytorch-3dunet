@@ -1,0 +1,5 @@
+# hdbscan
+scikit-image
+h5py
+Pillow
+matplotlib

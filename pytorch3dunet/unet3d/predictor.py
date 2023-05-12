@@ -1,5 +1,5 @@
 import time
-
+import os
 import h5py
 import hdbscan
 import numpy as np
@@ -89,64 +89,96 @@ class StandardPredictor(_AbstractPredictor):
         self._validate_halo(patch_halo, self.config['loaders']['test']['slice_builder'])
         logger.info(f'Using patch_halo: {patch_halo}')
 
-        # create destination H5 file
-        h5_output_file = h5py.File(self.output_file, 'w')
-        # allocate prediction and normalization arrays
-        logger.info('Allocating prediction and normalization arrays...')
-        prediction_maps, normalization_masks = self._allocate_prediction_maps(prediction_maps_shape,
-                                                                              output_heads, h5_output_file)
-
         # Sets the module in evaluation mode explicitly (necessary for batchnorm/dropout layers if present)
         self.model.eval()
         # Set the `testing=true` flag otherwise the final Softmax/Sigmoid won't be applied!
         self.model.testing = True
         # Run predictions on the entire input dataset
+
+        total_time = 0
+        total_samples = 0
+        batch_time_list = []
+
         with torch.no_grad():
-            for batch, indices in self.loader:
+            for index, (batch, indices) in enumerate(self.loader):
                 # send batch to device
                 batch = batch.to(device)
+                ### channels_last
+                if self.config['channels_last']:
+                    try:
+                        batch = batch.contiguous(memory_format=torch.channels_last_3d)
+                    except:
+                        pass
+                # jit
+                if self.config['jit']:
+                    self.model = torch.jit.trace(self.model.eval(), batch)
 
                 # forward pass
-                predictions = self.model(batch)
-
+                if self.config['profile']:
+                    with torch.profiler.profile(
+                        activities=[torch.profiler.ProfilerActivity.CPU],
+                        record_shapes=True,
+                        schedule=torch.profiler.schedule(
+                            wait=int(self.config['num_iter']/2),
+                            warmup=2,
+                            active=1,
+                        ),
+                        on_trace_ready=self.trace_handler,
+                    ) as p:
+                        for i in range(self.config['num_iter']):
+                            tic = time.time()
+                            predictions = self.model(batch)
+                            p.step()
+                            toc = time.time()
+                            elapsed = toc - tic
+                            print("Iteration: {}, inference time: {} sec.".format(i, elapsed), flush=True)
+                            if i >= self.config['num_warmup']:
+                                batch_time_list.append(elapsed * 1000)
+                                total_time += toc - tic
+                                total_samples += batch.size()[0]
+                else:
+                    for i in range(self.config['num_iter']):
+                        tic = time.time()
+                        predictions = self.model(batch)
+                        toc = time.time()
+                        elapsed = toc - tic
+                        print("Iteration: {}, inference time: {} sec.".format(i, elapsed), flush=True)
+                        if i >= self.config['num_warmup']:
+                            batch_time_list.append(elapsed * 1000)
+                            total_time += toc - tic
+                            total_samples += batch.size()[0]
                 # wrap predictions into a list if there is only one output head from the network
                 if output_heads == 1:
                     predictions = [predictions]
+                break
 
-                # for each output head
-                for prediction, prediction_map, normalization_mask in zip(predictions, prediction_maps,
-                                                                          normalization_masks):
+        print("\n", "-"*20, "Summary", "-"*20)
+        latency = total_time / total_samples * 1000
+        throughput = total_samples / total_time
+        print("inference latency:\t {:.3f} ms".format(latency))
+        print("inference Throughput:\t {:.2f} samples/s".format(throughput))
+        # P50
+        batch_time_list.sort()
+        p50_latency = batch_time_list[int(len(batch_time_list) * 0.50) - 1]
+        p90_latency = batch_time_list[int(len(batch_time_list) * 0.90) - 1]
+        p99_latency = batch_time_list[int(len(batch_time_list) * 0.99) - 1]
+        print('Latency P50:\t %.3f ms\nLatency P90:\t %.3f ms\nLatency P99:\t %.3f ms\n'\
+                % (p50_latency, p90_latency, p99_latency))
 
-                    # convert to numpy array
-                    prediction = prediction.cpu().numpy()
+    def trace_handler(self, p):
+        output = p.key_averages().table(sort_by="self_cpu_time_total")
+        print(output)
+        import pathlib
+        timeline_dir = str(pathlib.Path.cwd()) + '/timeline/'
+        if not os.path.exists(timeline_dir):
+            try:
+                os.makedirs(timeline_dir)
+            except:
+                pass
+        timeline_file = timeline_dir + 'timeline-' + str(torch.backends.quantized.engine) + '-' + \
+                    '3dunet-' + str(p.step_num) + '-' + str(os.getpid()) + '.json'
+        p.export_chrome_trace(timeline_file)
 
-                    # for each batch sample
-                    for pred, index in zip(prediction, indices):
-                        # save patch index: (C,D,H,W)
-                        if prediction_channel is None:
-                            channel_slice = slice(0, out_channels)
-                        else:
-                            channel_slice = slice(0, 1)
-                        index = (channel_slice,) + index
-
-                        if prediction_channel is not None:
-                            # use only the 'prediction_channel'
-                            logger.info(f"Using channel '{prediction_channel}'...")
-                            pred = np.expand_dims(pred[prediction_channel], axis=0)
-
-                        logger.info(f'Saving predictions for slice:{index}...')
-
-                        # remove halo in order to avoid block artifacts in the output probability maps
-                        u_prediction, u_index = remove_halo(pred, index, volume_shape, patch_halo)
-                        # accumulate probabilities into the output prediction array
-                        prediction_map[u_index] += u_prediction
-                        # count voxel visits for normalization
-                        normalization_mask[u_index] += 1
-
-        # save results to
-        self._save_results(prediction_maps, normalization_masks, output_heads, h5_output_file, self.loader.dataset)
-        # close the output H5 file
-        h5_output_file.close()
 
     def _allocate_prediction_maps(self, output_shape, output_heads, output_file):
         # initialize the output prediction arrays

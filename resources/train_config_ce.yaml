@@ -25,13 +25,13 @@ trainer:
   # path to latest checkpoint; if provided the training will be resumed from that checkpoint
   resume: null
   # how many iterations between validations
-  validate_after_iters: 20
+  validate_after_iters: 200000
   # how many iterations between tensorboard logging
-  log_after_iters: 20
+  log_after_iters: 200000
   # max number of epochs
-  epochs: 50
+  epochs: 1
   # max number of iterations
-  iters: 100000
+  iters: 100
   # model with higher eval score is considered better
   eval_score_higher_is_better: True
 # optimizer configuration
@@ -70,7 +70,7 @@ loaders:
   # when reading from multiple threads.
   dataset: StandardHDF5Dataset
   # batch dimension; if number of GPUs is N > 1, then a batch_size of N * batch_size will automatically be taken for DataParallel
-  batch_size: 1
+  batch_size: 32
   # how many subprocesses to use for data loading
   num_workers: 4
   # path to the raw data within the H5

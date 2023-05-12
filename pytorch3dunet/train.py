@@ -32,7 +32,7 @@ def _create_trainer(config, model, optimizer, lr_scheduler, loss_criterion, eval
         # continue training from a given checkpoint
         return UNet3DTrainer.from_checkpoint(resume, model,
                                              optimizer, lr_scheduler, loss_criterion,
-                                             eval_criterion, loaders, tensorboard_formatter=tensorboard_formatter)
+                                             eval_criterion, loaders, tensorboard_formatter=tensorboard_formatter, config=config)
     elif pre_trained is not None:
         # fine-tune a given pre-trained model
         return UNet3DTrainer.from_pretrained(pre_trained, model, optimizer, lr_scheduler, loss_criterion,
@@ -43,7 +43,7 @@ def _create_trainer(config, model, optimizer, lr_scheduler, loss_criterion, eval
                                              log_after_iters=trainer_config['log_after_iters'],
                                              eval_score_higher_is_better=trainer_config['eval_score_higher_is_better'],
                                              tensorboard_formatter=tensorboard_formatter,
-                                             skip_train_validation=skip_train_validation)
+                                             skip_train_validation=skip_train_validation, config=config)
     else:
         # start training from scratch
         return UNet3DTrainer(model, optimizer, lr_scheduler, loss_criterion, eval_criterion,
@@ -54,7 +54,7 @@ def _create_trainer(config, model, optimizer, lr_scheduler, loss_criterion, eval
                              log_after_iters=trainer_config['log_after_iters'],
                              eval_score_higher_is_better=trainer_config['eval_score_higher_is_better'],
                              tensorboard_formatter=tensorboard_formatter,
-                             skip_train_validation=skip_train_validation)
+                             skip_train_validation=skip_train_validation, config=config)
 
 
 def _create_optimizer(config, model):
@@ -104,7 +104,12 @@ def main():
     # put the model on GPUs
     logger.info(f"Sending the model to '{config['device']}'")
     model = model.to(device)
-
+    if config["channels_last"]:
+        try:
+            model = model.to(memory_format=torch.channels_last)
+            print("---- Use NHWC model.")
+        except:
+            print("---- Use normal model.")
     # Log the number of learnable parameters
     logger.info(f'Number of learnable params {get_number_of_learnable_parameters(model)}')
 
@@ -121,12 +126,19 @@ def main():
 
     # Create learning rate adjustment strategy
     lr_scheduler = _create_lr_scheduler(config, optimizer)
-
-    # Create model trainer
-    trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
-                              loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
-    # Start training
-    trainer.fit()
+    if config["precision"] == "bfloat16":
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            # Create model trainer
+            trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
+                                    loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
+            # Start training
+            trainer.fit()
+    else:
+        # Create model trainer
+        trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
+                                loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
+        # Start training
+        trainer.fit()
 
 
 if __name__ == '__main__':

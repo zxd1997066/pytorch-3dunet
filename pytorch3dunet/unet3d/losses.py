@@ -195,7 +195,7 @@ class WeightedCrossEntropyLoss(nn.Module):
         flattened = flatten(input)
         nominator = (1. - flattened).sum(-1)
         denominator = flattened.sum(-1)
-        class_weights = Variable(nominator / denominator, requires_grad=False)
+        class_weights = Variable(nominator / denominator, requires_grad=True)
         return class_weights
 
 

@@ -61,15 +61,35 @@ def main():
     model = model.to(device)
 
     logger.info('Loading HDF5 datasets...')
-    for test_loader in get_test_loaders(config):
-        logger.info(f"Processing '{test_loader.dataset.file_path}'...")
-
-        output_file = _get_output_file(test_loader.dataset)
-
-        predictor = _get_predictor(model, test_loader, output_file, config)
-        # run the model prediction on the entire dataset and save to the 'output_file' H5
-        predictor.predict()
+    assert 'loaders' in config, 'Could not find data loaders configuration'
+    loaders_config = config['loaders']
+    batch_size = loaders_config.get('batch_size', 1)
+    print("Batch Size: {}".format(batch_size))
+    if config['channels_last']:
+        try:
+            model = model.to(memory_format=torch.channels_last_3d)
+            print("[INFO] Use NHWC model.")
+        except:
+            print("[WARN] Model NHWC failed! Use normal model.")
+    if config['precision'] == "bfloat16":
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+            for index, test_loader in enumerate(get_test_loaders(config)):
+                logger.info(f"Processing '{test_loader.dataset.file_path}'...")
+                output_file = _get_output_file(test_loader.dataset)
+                predictor = _get_predictor(model, test_loader, output_file, config)
+                # run the model prediction on the entire dataset and save to the 'output_file' H5
+                predictor.predict()
+                break
+    else:
+        for index, test_loader in enumerate(get_test_loaders(config)):
+            logger.info(f"Processing '{test_loader.dataset.file_path}'...")
+            output_file = _get_output_file(test_loader.dataset)
+            predictor = _get_predictor(model, test_loader, output_file, config)
+            # run the model prediction on the entire dataset and save to the 'output_file' H5
+            predictor.predict()
+            break
 
 
 if __name__ == '__main__':
     main()
+
