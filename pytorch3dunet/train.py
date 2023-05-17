@@ -133,6 +133,13 @@ def main():
                                     loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
             # Start training
             trainer.fit()
+    elif config["precision"] == "float16":
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+            # Create model trainer
+            trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
+                                    loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
+            # Start training
+            trainer.fit()
     else:
         # Create model trainer
         trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,

@@ -80,6 +80,15 @@ def main():
                 # run the model prediction on the entire dataset and save to the 'output_file' H5
                 predictor.predict()
                 break
+    elif config['precision'] == "float16":
+        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+            for index, test_loader in enumerate(get_test_loaders(config)):
+                logger.info(f"Processing '{test_loader.dataset.file_path}'...")
+                output_file = _get_output_file(test_loader.dataset)
+                predictor = _get_predictor(model, test_loader, output_file, config)
+                # run the model prediction on the entire dataset and save to the 'output_file' H5
+                predictor.predict()
+                break
     else:
         for index, test_loader in enumerate(get_test_loaders(config)):
             logger.info(f"Processing '{test_loader.dataset.file_path}'...")
