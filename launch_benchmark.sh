@@ -10,7 +10,7 @@ function main {
     fetch_device_info
     set_environment
     #
-    pip install git+https://github.com/scikit-learn-contrib/hdbscan.git
+    #pip install git+https://github.com/scikit-learn-contrib/hdbscan.git
     pip install -r ${workload_dir}/requirements.txt
     # pip install --no-deps torchvision -f https://download.pytorch.org/whl/torch_stable.html
     pip uninstall -y pytorch3dunet
