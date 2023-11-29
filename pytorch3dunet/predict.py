@@ -71,6 +71,8 @@ def main():
             print("[INFO] Use NHWC model.")
         except:
             print("[WARN] Model NHWC failed! Use normal model.")
+    if config['compile']:
+        model = torch.compile(model, backend=config['backend'], options={"freezing": True})
     if config['precision'] == "bfloat16":
         with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
             for index, test_loader in enumerate(get_test_loaders(config)):
