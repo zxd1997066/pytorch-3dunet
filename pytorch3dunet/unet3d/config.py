@@ -20,6 +20,10 @@ def load_config():
     parser.add_argument('--channels_last', type=int, default=1, help='Use NHWC.')
     parser.add_argument('--arch', type=str, default=None, help='model name.')
     parser.add_argument('--profile', action='store_true', default=False)
+    parser.add_argument("--compile", action='store_true', default=False,
+                    help="enable torch.compile")
+    parser.add_argument("--backend", type=str, default='inductor',
+                    help="enable torch.compile backend")
 
     args = parser.parse_args()
     config = _load_config_yaml(args.config)
@@ -45,6 +49,8 @@ def load_config():
     config['precision'] = args.precision
     config['channels_last'] = args.channels_last
     config['profile'] = args.profile
+    config['compile'] = args.compile
+    config['backend'] = args.backend
     return config
 
 
