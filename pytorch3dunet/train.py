@@ -110,6 +110,8 @@ def main():
             print("---- Use NHWC model.")
         except:
             print("---- Use normal model.")
+    if config['compile']:
+        model = torch.compile(model, backend=config['backend'], options={"freezing": True})
     # Log the number of learnable parameters
     logger.info(f'Number of learnable params {get_number_of_learnable_parameters(model)}')
 
