@@ -74,7 +74,7 @@ def main():
     if config['compile']:
         model = torch.compile(model, backend=config['backend'], options={"freezing": True})
     if config['precision'] == "bfloat16":
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.bfloat16):
             for index, test_loader in enumerate(get_test_loaders(config)):
                 logger.info(f"Processing '{test_loader.dataset.file_path}'...")
                 output_file = _get_output_file(test_loader.dataset)
@@ -83,7 +83,7 @@ def main():
                 predictor.predict()
                 break
     elif config['precision'] == "float16":
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+        with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
             for index, test_loader in enumerate(get_test_loaders(config)):
                 logger.info(f"Processing '{test_loader.dataset.file_path}'...")
                 output_file = _get_output_file(test_loader.dataset)

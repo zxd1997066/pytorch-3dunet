@@ -129,14 +129,14 @@ def main():
     # Create learning rate adjustment strategy
     lr_scheduler = _create_lr_scheduler(config, optimizer)
     if config["precision"] == "bfloat16":
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.bfloat16):
+        with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.bfloat16):
             # Create model trainer
             trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
                                     loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
             # Start training
             trainer.fit()
     elif config["precision"] == "float16":
-        with torch.cpu.amp.autocast(enabled=True, dtype=torch.half):
+        with torch.autocast(device_type="cuda" if torch.cuda.is_available() else "cpu", enabled=True, dtype=torch.half):
             # Create model trainer
             trainer = _create_trainer(config, model=model, optimizer=optimizer, lr_scheduler=lr_scheduler,
                                     loss_criterion=loss_criterion, eval_criterion=eval_criterion, loaders=loaders)
