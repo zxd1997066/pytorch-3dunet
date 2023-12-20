@@ -21,6 +21,10 @@ function main {
         rsync -avz /home2/pytorch-broad-models/3DUNet/3dunet/best_checkpoint.pytorch 3dunet/best_checkpoint.pytorch
     fi
 
+    if [ "${device}" == "cuda" ];then
+        pip install hdbscan
+    fi
+
     # set mode
     if [ "$mode_name" == "train" ];then
         exec_cmd=" train.py --config ../resources/train_config_ce.yaml "
