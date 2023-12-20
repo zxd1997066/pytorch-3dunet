@@ -8,10 +8,10 @@ from pytorch3dunet.datasets.utils import get_test_loaders
 from pytorch3dunet.unet3d import utils
 from pytorch3dunet.unet3d.config import load_config
 from pytorch3dunet.unet3d.model import get_model
-from torch._inductor import config
-import torch._inductor
-torch._inductor.config.profiler_mark_wrapper_call = True
-torch._inductor.config.cpp.enable_kernel_profile = True
+# from torch._inductor import config
+# import torch._inductor
+# torch._inductor.config.profiler_mark_wrapper_call = True
+# torch._inductor.config.cpp.enable_kernel_profile = True
 
 logger = utils.get_logger('UNet3DPredict')
 
