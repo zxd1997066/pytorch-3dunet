@@ -40,6 +40,9 @@ function main {
     for model_name in ${model_name_list[@]}
     do
         # pre run
+        if [ $batch_size -le 0 ];then
+            batch_size=64
+        fi
         python ${exec_cmd} --num_iter 2 --num_warmup 1 --batch_size ${batch_size} \
             --channels_last ${channels_last} --precision ${precision} ${addtion_options}
         #
