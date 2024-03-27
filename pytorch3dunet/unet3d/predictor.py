@@ -4,6 +4,7 @@ import h5py
 import hdbscan
 import numpy as np
 import torch
+import torch._inductor
 from sklearn.cluster import MeanShift
 
 from pytorch3dunet.datasets.utils import SliceBuilder
@@ -115,6 +116,8 @@ class StandardPredictor(_AbstractPredictor):
 
                 # forward pass
                 if self.config['profile']:
+                    torch._inductor.config.profiler_mark_wrapper_call = True
+                    torch._inductor.config.cpp.enable_kernel_profile = True
                     with torch.profiler.profile(
                         activities=[torch.profiler.ProfilerActivity.CPU],
                         record_shapes=True,
