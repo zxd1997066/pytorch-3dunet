@@ -84,7 +84,10 @@ def main():
     # Load and log experiment configuration
     config = load_config()
     logger.info(config)
-
+    if config['triton_cpu']:
+        print("run with triton cpu backend")
+        import torch._inductor.config
+        torch._inductor.config.cpu_backend="triton"
     manual_seed = config.get('manual_seed', None)
     if manual_seed is not None:
         logger.info(f'Seed the RNG for all devices with {manual_seed}')
