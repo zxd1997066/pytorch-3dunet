@@ -24,6 +24,8 @@ def load_config():
                     help="enable torch.compile")
     parser.add_argument("--backend", type=str, default='inductor',
                     help="enable torch.compile backend")
+    parser.add_argument("--triton_cpu", action='store_true', default=False,
+                    help="enable triton_cpu")
 
     args = parser.parse_args()
     config = _load_config_yaml(args.config)
@@ -51,6 +53,7 @@ def load_config():
     config['profile'] = args.profile
     config['compile'] = args.compile
     config['backend'] = args.backend
+    config['triton_cpu'] = args.triton_cpu
     return config
 
 
